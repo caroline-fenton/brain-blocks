@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brain Blocks</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 24px;
+      }
+
+      canvas {
+        border: 1px solid #ddd;
+      }
+    </style>
+  </head>
+
+  <body>
+    <script type="module">
+      import { prepareWithSegments, layoutWithLines } from 'https://esm.sh/@chenglou/pretext'
+
+      const WIDTH = 560
+      const LINE_HEIGHT = 24
+      const FONT = '15px sans-serif'
+      const PADDING = 16
+
+      const text =
+        'Let’s say we have a sample of animals from a shelter intake form. Their ages are shown in the table. This extra sentence is here so we can see the text wrap beside the table instead of only appearing above and below it. The goal is to treat the table as a structured block while Pretext handles the line breaking around available space.'
+
+      const tableData = [
+        ['Animal', 'Age'],
+        ['Dog', '5'],
+        ['Cat', '7'],
+        ['Rabbit', '3'],
+        ['Turtle', '42'],
+        ['Hamster', '2'],
+      ]
+
+      const colWidths = [160, 80]
+      const rowHeight = 32
+      const tableWidth = colWidths[0] + colWidths[1]
+      const tableHeight = tableData.length * rowHeight
+
+      const tableX = PADDING
+      const tableY = 88
+      const gap = 18
+
+      const canvas = document.createElement('canvas')
+      canvas.width = WIDTH
+      canvas.height = 420
+      document.body.appendChild(canvas)
+
+      const ctx = canvas.getContext('2d')
+      ctx.font = FONT
+      ctx.textBaseline = 'alphabetic'
+
+      function drawTable(x, y, data) {
+        let currentY = y
+
+        for (let r = 0; r < data.length; r++) {
+          let currentX = x
+
+          for (let c = 0; c < data[r].length; c++) {
+            const cellWidth = colWidths[c]
+
+            if (r === 0) {
+              ctx.fillStyle = '#f3f4f6'
+              ctx.fillRect(currentX, currentY, cellWidth, rowHeight)
+            } else {
+              ctx.fillStyle = '#fff'
+              ctx.fillRect(currentX, currentY, cellWidth, rowHeight)
+            }
+
+            ctx.strokeStyle = '#999'
+            ctx.strokeRect(currentX, currentY, cellWidth, rowHeight)
+
+            ctx.fillStyle = '#111'
+            ctx.fillText(data[r][c], currentX + 10, currentY + 21)
+
+            currentX += cellWidth
+          }
+
+          currentY += rowHeight
+        }
+      }
+
+      function drawWrappedText(text) {
+        const words = text.split(' ')
+        let currentWords = []
+        let y = PADDING
+        let wordIndex = 0
+
+        while (wordIndex < words.length && y < canvas.height - PADDING) {
+          const lineTop = y
+          const lineBottom = y + LINE_HEIGHT
+
+          const overlapsTable =
+            lineBottom > tableY && lineTop < tableY + tableHeight
+
+          const x = overlapsTable
+            ? tableX + tableWidth + gap
+            : PADDING
+
+          const availableWidth = overlapsTable
+            ? WIDTH - x - PADDING
+            : WIDTH - PADDING * 2
+
+          currentWords = []
+
+          while (wordIndex < words.length) {
+            const nextWords = [...currentWords, words[wordIndex]]
+            const candidate = nextWords.join(' ')
+
+            const prepared = prepareWithSegments(candidate, FONT)
+            const layout = layoutWithLines(prepared, availableWidth, LINE_HEIGHT)
+
+            if (layout.lineCount > 1 && currentWords.length > 0) {
+              break
+            }
+
+            currentWords = nextWords
+            wordIndex++
+          }
+
+          const lineText = currentWords.join(' ')
+          ctx.fillStyle = '#111'
+          ctx.fillText(lineText, x, y + LINE_HEIGHT - 6)
+
+          y += LINE_HEIGHT
+        }
+      }
+
+      ctx.fillStyle = '#fff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      drawTable(tableX, tableY, tableData)
+      drawWrappedText(text)
+    </script>
+  </body>
+</html>

@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Worked Example — Anchored Callouts</title>
+    <script>
+      window.MathJax = {
+        tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$']] },
+        svg: { fontCache: 'global' },
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+    <style>
+      body {
+        font-family: Georgia, 'Times New Roman', serif;
+        background: #faf9f6;
+        color: #1a1a1a;
+        margin: 0;
+        padding: 32px 16px 64px;
+      }
+      .page {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-family: -apple-system, system-ui, sans-serif;
+        font-size: 22px;
+        margin: 0 0 4px;
+      }
+      .subtitle {
+        font-family: -apple-system, system-ui, sans-serif;
+        font-size: 13px;
+        color: #6b6b6b;
+        margin-bottom: 24px;
+      }
+      #stage {
+        position: relative;
+      }
+      .equation-block {
+        position: absolute;
+        background: #ffffff;
+        border: 1px solid #e2e0d8;
+        border-radius: 4px;
+        padding: 14px 18px;
+        box-sizing: border-box;
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+      }
+      .callout-block {
+        position: absolute;
+        background: #fff7e6;
+        border-left: 3px solid #d97706;
+        padding: 10px 12px 12px;
+        box-sizing: border-box;
+        font-family: -apple-system, system-ui, sans-serif;
+        font-size: 13px;
+        line-height: 1.45;
+        color: #4b3a17;
+        border-radius: 0 3px 3px 0;
+      }
+      .callout-label {
+        font-weight: 700;
+        color: #92400e;
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 4px;
+      }
+      .text-line {
+        position: absolute;
+        font-size: 16px;
+        line-height: 26px;
+        white-space: nowrap;
+      }
+      #anchor-svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>Deriving the Quadratic Formula</h1>
+      <div class="subtitle">
+        Pretext handles text flow. MathJax renders the equations. Callouts are
+        anchored to specific steps with dashed connectors.
+      </div>
+      <div id="stage"></div>
+    </div>
+
+    <script type="module">
+      import {
+        prepareWithSegments,
+        layoutWithLines,
+      } from 'https://esm.sh/@chenglou/pretext'
+
+      const STAGE_WIDTH = 720
+      const LINE_HEIGHT = 26
+      const FONT_SIZE = 16
+      const FONT = `${FONT_SIZE}px Georgia, "Times New Roman", serif`
+      const GAP_X = 20
+      const GAP_Y = 18
+      const EQ_X = 8
+      const EQ_WIDTH = 320
+      const CALLOUT_WIDTH = 230
+      const CALLOUT_RIGHT_PAD = 8
+      const CALLOUT_X = STAGE_WIDTH - CALLOUT_WIDTH - CALLOUT_RIGHT_PAD
+
+      const intro =
+        "We want to solve every equation of the form ax² + bx + c = 0 for x. The quadratic formula gives a closed-form answer, but on its own it can feel like a magic trick. The derivation below shows where it actually comes from. Each step rewrites the equation into a form that's a little closer to having x by itself."
+
+      const between1 =
+        'Divide both sides by a so the leading coefficient becomes 1. This makes the next move — completing the square — much cleaner, since the technique assumes a coefficient of 1 on the x² term.'
+
+      const between2 =
+        "Move the constant term to the right side. We're isolating the part of the expression that we will turn into a perfect square."
+
+      const between3 =
+        "Add the square of half the linear coefficient to both sides. This is the completing-the-square move: it converts the left side into a perfect-square trinomial without changing the equation's truth."
+
+      const between4 =
+        'Factor the left side as a perfect square and combine the terms on the right over a common denominator. The familiar discriminant b² − 4ac begins to appear.'
+
+      const between5 =
+        'Take the square root of both sides, remembering the plus-or-minus, then subtract b/(2a) to isolate x. The result is the quadratic formula in its standard form.'
+
+      const closing =
+        'Notice that nothing in the derivation depended on the specific values of a, b, or c — only on the assumption that a is not zero, which is required for the equation to be quadratic in the first place. Every step is reversible, which is why the formula works for every quadratic equation.'
+
+      const equations = [
+        {
+          tex: 'ax^2 + bx + c = 0',
+          callout: {
+            label: 'Starting point',
+            text: 'The general quadratic. Our goal is to solve for x using only a, b, and c.',
+          },
+        },
+        {
+          tex: 'x^2 + \\tfrac{b}{a}x + \\tfrac{c}{a} = 0',
+          callout: {
+            label: 'Why divide by a?',
+            text: 'Completing the square assumes the x² coefficient is 1, so we normalize first.',
+          },
+        },
+        {
+          tex: 'x^2 + \\tfrac{b}{a}x = -\\tfrac{c}{a}',
+          callout: null,
+        },
+        {
+          tex: 'x^2 + \\tfrac{b}{a}x + \\left(\\tfrac{b}{2a}\\right)^2 = -\\tfrac{c}{a} + \\left(\\tfrac{b}{2a}\\right)^2',
+          callout: {
+            label: 'Complete the square',
+            text: 'Half the x-coefficient, squared. Adding it to both sides keeps the equation balanced.',
+          },
+        },
+        {
+          tex: '\\left(x + \\tfrac{b}{2a}\\right)^2 = \\tfrac{b^2 - 4ac}{4a^2}',
+          callout: {
+            label: 'Discriminant appears',
+            text: 'The b² − 4ac in the numerator is the discriminant — it shows up here naturally, not by definition.',
+          },
+        },
+        {
+          tex: 'x = \\dfrac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}',
+          callout: {
+            label: 'The formula',
+            text: 'Square-root both sides (yielding ±), then subtract b/(2a) to isolate x.',
+          },
+        },
+      ]
+
+      const sequence = [
+        { type: 'text', content: intro },
+        { type: 'equation', index: 0 },
+        { type: 'text', content: between1 },
+        { type: 'equation', index: 1 },
+        { type: 'text', content: between2 },
+        { type: 'equation', index: 2 },
+        { type: 'text', content: between3 },
+        { type: 'equation', index: 3 },
+        { type: 'text', content: between4 },
+        { type: 'equation', index: 4 },
+        { type: 'text', content: between5 },
+        { type: 'equation', index: 5 },
+        { type: 'text', content: closing },
+      ]
+
+      const stage = document.getElementById('stage')
+      stage.style.width = STAGE_WIDTH + 'px'
+
+      await new Promise(resolve => {
+        const check = () => {
+          if (window.MathJax && window.MathJax.typesetPromise) resolve()
+          else setTimeout(check, 50)
+        }
+        check()
+      })
+
+      const eqEls = equations.map(eq => {
+        const el = document.createElement('div')
+        el.className = 'equation-block'
+        el.style.left = EQ_X + 'px'
+        el.style.top = '0px'
+        el.style.width = EQ_WIDTH + 'px'
+        el.style.visibility = 'hidden'
+        el.innerHTML = `\\(${eq.tex}\\)`
+        stage.appendChild(el)
+        return el
+      })
+      await window.MathJax.typesetPromise(eqEls)
+
+      const blocks = []
+      const calloutPlacements = []
+      const textLines = []
+      let y = 0
+
+      function getLineLayout(lineTop) {
+        const lineBottom = lineTop + LINE_HEIGHT
+        const overlapping = blocks.filter(
+          b => lineBottom > b.y && lineTop < b.y + b.height
+        )
+        let x = EQ_X
+        let rightEdge = STAGE_WIDTH - CALLOUT_RIGHT_PAD
+        const left = overlapping.find(b => b.side === 'left')
+        const right = overlapping.find(b => b.side === 'right')
+        if (left) x = left.x + left.width + GAP_X
+        if (right) rightEdge = right.x - GAP_X
+        return { x, width: Math.max(0, rightEdge - x) }
+      }
+
+      function flowText(text, startY) {
+        const words = text.split(/\s+/).filter(Boolean)
+        let cy = startY
+        let i = 0
+        let safety = 0
+        while (i < words.length && safety++ < 5000) {
+          const { x, width } = getLineLayout(cy)
+          if (width < 80) {
+            cy += LINE_HEIGHT
+            continue
+          }
+          let chosen = []
+          while (i < words.length) {
+            const trial = [...chosen, words[i]]
+            const prepared = prepareWithSegments(trial.join(' '), FONT)
+            const layout = layoutWithLines(prepared, width, LINE_HEIGHT)
+            if (layout.lineCount > 1 && chosen.length > 0) break
+            chosen = trial
+            i++
+          }
+          textLines.push({ x, y: cy, width, content: chosen.join(' ') })
+          cy += LINE_HEIGHT
+        }
+        return cy
+      }
+
+      for (const item of sequence) {
+        if (item.type === 'text') {
+          y = flowText(item.content, y) + 6
+        } else {
+          const eq = equations[item.index]
+          const el = eqEls[item.index]
+          const eqHeight = el.offsetHeight
+          el.style.top = y + 'px'
+          el.style.visibility = 'visible'
+          blocks.push({
+            side: 'left',
+            x: EQ_X,
+            y,
+            width: EQ_WIDTH,
+            height: eqHeight,
+          })
+
+          if (eq.callout) {
+            const cEl = document.createElement('div')
+            cEl.className = 'callout-block'
+            cEl.style.width = CALLOUT_WIDTH + 'px'
+            cEl.style.left = CALLOUT_X + 'px'
+            cEl.style.top = '0px'
+            cEl.style.visibility = 'hidden'
+            cEl.innerHTML = `<div class="callout-label">${eq.callout.label}</div>${eq.callout.text}`
+            stage.appendChild(cEl)
+            const cHeight = cEl.offsetHeight
+            let cy = y + (eqHeight - cHeight) / 2
+            if (cy < y) cy = y
+            const last = calloutPlacements[calloutPlacements.length - 1]
+            if (last && cy < last.y + last.height + 10) {
+              cy = last.y + last.height + 10
+            }
+            cEl.style.top = cy + 'px'
+            cEl.style.visibility = 'visible'
+            calloutPlacements.push({
+              y: cy,
+              height: cHeight,
+              anchorX: EQ_X + EQ_WIDTH,
+              anchorY: y + eqHeight / 2,
+            })
+            blocks.push({
+              side: 'right',
+              x: CALLOUT_X,
+              y: cy,
+              width: CALLOUT_WIDTH,
+              height: cHeight,
+            })
+          }
+
+          y += eqHeight + GAP_Y
+        }
+      }
+
+      for (const line of textLines) {
+        const el = document.createElement('div')
+        el.className = 'text-line'
+        el.style.left = line.x + 'px'
+        el.style.top = line.y + 'px'
+        el.style.width = line.width + 'px'
+        el.textContent = line.content
+        stage.appendChild(el)
+      }
+
+      const totalHeight = y + 40
+      stage.style.height = totalHeight + 'px'
+
+      const svgNS = 'http://www.w3.org/2000/svg'
+      const svg = document.createElementNS(svgNS, 'svg')
+      svg.id = 'anchor-svg'
+      svg.setAttribute('width', STAGE_WIDTH)
+      svg.setAttribute('height', totalHeight)
+      stage.insertBefore(svg, stage.firstChild)
+      for (const c of calloutPlacements) {
+        const path = document.createElementNS(svgNS, 'path')
+        const x1 = c.anchorX
+        const y1 = c.anchorY
+        const x2 = CALLOUT_X
+        const y2 = c.y + c.height / 2
+        const midX = (x1 + x2) / 2
+        const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+        path.setAttribute('d', d)
+        path.setAttribute('fill', 'none')
+        path.setAttribute('stroke', '#d97706')
+        path.setAttribute('stroke-width', '1')
+        path.setAttribute('stroke-dasharray', '3 3')
+        path.setAttribute('opacity', '0.7')
+        svg.appendChild(path)
+      }
+    </script>
+  </body>
+</html>

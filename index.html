@@ -20,13 +20,12 @@
     <script type="module">
       import { prepareWithSegments, layoutWithLines } from 'https://esm.sh/@chenglou/pretext'
 
-      const WIDTH = 560
+      const WIDTH = 640
+      const HEIGHT = 520
       const LINE_HEIGHT = 24
       const FONT = '15px sans-serif'
       const PADDING = 16
-
-      const text =
-        'Let’s say we have a sample of animals from a shelter intake form. Their ages are shown in the table. This extra sentence is here so we can see the text wrap beside the table instead of only appearing above and below it. The goal is to treat the table as a structured block while Pretext handles the line breaking around available space.'
+      const GAP = 18
 
       const tableData = [
         ['Animal', 'Age'],
@@ -37,83 +36,96 @@
         ['Hamster', '2'],
       ]
 
-      const colWidths = [160, 80]
-      const rowHeight = 32
-      const tableWidth = colWidths[0] + colWidths[1]
-      const tableHeight = tableData.length * rowHeight
+      const blocks = [
+        {
+          type: 'table',
+          x: 16,
+          y: 88,
+          width: 240,
+          height: 192,
+          data: tableData,
+        },
+        {
+          type: 'callout',
+          x: 360,
+          y: 300,
+          width: 240,
+          height: 96,
+          text: 'Structured blocks can constrain the text flow.',
+        },
+      ]
 
-      const tableX = PADDING
-      const tableY = 88
-      const gap = 18
+      const text =
+        'Let’s say we have a sample of animals from a shelter intake form. Their ages are shown in the table. This experiment treats the table as a structured block with its own dimensions. The text does not need to know that the block is a table. It only needs to know where the block is and how much space it takes up. This means the same layout logic could eventually work for images, charts, notes, glossary cards, practice questions, or other structured learning objects. The goal is to separate content structure from layout behavior, then let the rendering system compose them predictably.'
 
       const canvas = document.createElement('canvas')
       canvas.width = WIDTH
-      canvas.height = 420
+      canvas.height = HEIGHT
       document.body.appendChild(canvas)
 
       const ctx = canvas.getContext('2d')
       ctx.font = FONT
       ctx.textBaseline = 'alphabetic'
 
-      function drawTable(x, y, data) {
-        let currentY = y
+      function lineOverlapsBlock(lineTop, lineBottom, block) {
+        return lineBottom > block.y && lineTop < block.y + block.height
+      }
 
-        for (let r = 0; r < data.length; r++) {
-          let currentX = x
+      function getLineLayout(lineTop) {
+        const lineBottom = lineTop + LINE_HEIGHT
 
-          for (let c = 0; c < data[r].length; c++) {
-            const cellWidth = colWidths[c]
+        const overlappingBlocks = blocks.filter(block =>
+          lineOverlapsBlock(lineTop, lineBottom, block)
+        )
 
-            if (r === 0) {
-              ctx.fillStyle = '#f3f4f6'
-              ctx.fillRect(currentX, currentY, cellWidth, rowHeight)
-            } else {
-              ctx.fillStyle = '#fff'
-              ctx.fillRect(currentX, currentY, cellWidth, rowHeight)
-            }
-
-            ctx.strokeStyle = '#999'
-            ctx.strokeRect(currentX, currentY, cellWidth, rowHeight)
-
-            ctx.fillStyle = '#111'
-            ctx.fillText(data[r][c], currentX + 10, currentY + 21)
-
-            currentX += cellWidth
+        if (overlappingBlocks.length === 0) {
+          return {
+            x: PADDING,
+            width: WIDTH - PADDING * 2,
           }
+        }
 
-          currentY += rowHeight
+        const leftBlock = overlappingBlocks.find(block => block.x < WIDTH / 2)
+
+        if (leftBlock) {
+          const x = leftBlock.x + leftBlock.width + GAP
+          return {
+            x,
+            width: WIDTH - x - PADDING,
+          }
+        }
+
+        const rightBlock = overlappingBlocks.find(block => block.x >= WIDTH / 2)
+
+        if (rightBlock) {
+          return {
+            x: PADDING,
+            width: rightBlock.x - GAP - PADDING,
+          }
+        }
+
+        return {
+          x: PADDING,
+          width: WIDTH - PADDING * 2,
         }
       }
 
       function drawWrappedText(text) {
         const words = text.split(' ')
-        let currentWords = []
         let y = PADDING
         let wordIndex = 0
 
         while (wordIndex < words.length && y < canvas.height - PADDING) {
-          const lineTop = y
-          const lineBottom = y + LINE_HEIGHT
+          const { x, width } = getLineLayout(y)
 
-          const overlapsTable =
-            lineBottom > tableY && lineTop < tableY + tableHeight
-
-          const x = overlapsTable
-            ? tableX + tableWidth + gap
-            : PADDING
-
-          const availableWidth = overlapsTable
-            ? WIDTH - x - PADDING
-            : WIDTH - PADDING * 2
-
-          currentWords = []
+          let currentWords = []
 
           while (wordIndex < words.length) {
             const nextWords = [...currentWords, words[wordIndex]]
             const candidate = nextWords.join(' ')
 
             const prepared = prepareWithSegments(candidate, FONT)
-            const layout = layoutWithLines(prepared, availableWidth, LINE_HEIGHT)
+            const layout = layoutWithLines(prepared, width, LINE_HEIGHT)
 
             if (layout.lineCount > 1 && currentWords.length > 0) {
               break
@@ -123,18 +135,62 @@
             wordIndex++
           }
 
-          const lineText = currentWords.join(' ')
           ctx.fillStyle = '#111'
-          ctx.fillText(lineText, x, y + LINE_HEIGHT - 6)
+          ctx.fillText(currentWords.join(' '), x, y + LINE_HEIGHT - 6)
 
           y += LINE_HEIGHT
+        }
+      }
+
+      function drawTable(block) {
+        const colWidths = [160, 80]
+        const rowHeight = 32
+        let currentY = block.y
+
+        for (let r = 0; r < block.data.length; r++) {
+          let currentX = block.x
+
+          for (let c = 0; c < block.data[r].length; c++) {
+            const cellWidth = colWidths[c]
+
+            ctx.fillStyle = r === 0 ? '#f3f4f6' : '#fff'
+            ctx.fillRect(currentX, currentY, cellWidth, rowHeight)
+
+            ctx.strokeStyle = '#999'
+            ctx.strokeRect(currentX, currentY, cellWidth, rowHeight)
+
+            ctx.fillStyle = '#111'
+            ctx.fillText(block.data[r][c], currentX + 10, currentY + 21)
+
+            currentX += cellWidth
+          }
+
+          currentY += rowHeight
+        }
+      }
+
+      function drawCallout(block) {
+        ctx.fillStyle = '#f8fafc'
+        ctx.fillRect(block.x, block.y, block.width, block.height)
+
+        ctx.strokeStyle = '#94a3b8'
+        ctx.strokeRect(block.x, block.y, block.width, block.height)
+
+        ctx.fillStyle = '#111'
+        ctx.fillText(block.text, block.x + 12, block.y + 32)
+      }
+
+      function drawBlocks() {
+        for (const block of blocks) {
+          if (block.type === 'table') drawTable(block)
+          if (block.type === 'callout') drawCallout(block)
         }
       }
 
       ctx.fillStyle = '#fff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      drawTable(tableX, tableY, tableData)
+      drawBlocks()
       drawWrappedText(text)
     </script>
   </body>
